@@ -4,7 +4,7 @@
  * @file
  * Módulo feito para o curso da Fisqua
  */
-define('BOVESPA_URL', 'http://rafaelsilva.net/random.php?q=');
+define('BOVESPA_URL', 'http://<URL DA BOVESPA>');
 
 /**
  * Implementa hook_help().
