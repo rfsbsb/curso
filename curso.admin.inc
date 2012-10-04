@@ -12,12 +12,12 @@
  */
 function curso_config($form, &$form_state) {
 
-  $form['papel'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Papel na Bovespa'),
-    '#description' => t('Digite um papel da Bovespa. Exemplo: VALE3'),
+  $form['papeis'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Papéis na Bovespa'),
+    '#description' => t('Digite os papeis na Bovespa, um por linha. Exemplo: VALE3'),
     '#required' => TRUE,
-    '#default_value' => variable_get('curso_bovespa_papel',  ''),
+    '#default_value' => variable_get('curso_bovespa_papeis',  ''),
   );
 
   $form['submit'] = array(
@@ -38,7 +38,7 @@ function curso_config($form, &$form_state) {
  *   Dados submetidos
  */
 function curso_config_validate($form, &$form_state) {
-  $papel = $form_state['values']['papel'];
+  $papel = $form_state['values']['papeis'];
   if (strtoupper($papel) == 'VALE3') {
     form_set_error('papel', t('VALE3 é considerado inválido.'));
   }
@@ -55,9 +55,9 @@ function curso_config_validate($form, &$form_state) {
  *   Dados submetidos
  */
 function curso_config_submit($form, &$form_state) {
-  $papel = strtoupper($form_state['values']['papel']);
-  variable_set('curso_bovespa_papel', $papel);
-  drupal_set_message(t('O papel @papel foi salvo', array('@papel' => $papel)));
+  $papeis = strtoupper($form_state['values']['papeis']);
+  variable_set('curso_bovespa_papeis', $papeis);
+  drupal_set_message(t('Os papéis @papel foram salvos', array('@papel' => implode(",", explode("\n", $papeis) ))));
   // limpando o cache para forçar um reload.
-  cache_clear_all('curso_papel_cache', 'cache');
+  cache_clear_all('curso_papeis_cache', 'cache');
 }

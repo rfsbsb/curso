@@ -7,7 +7,7 @@
  *
  */
 function curso_uninstall() {
-  variable_del('curso_bovespa_papel');
+  variable_del('curso_bovespa_papeis');
 }
 
 /**
@@ -17,5 +17,5 @@ function curso_uninstall() {
  *
  */
 function curso_install() {
-  variable_set('curso_bovespa_papel', 'PETR4');
+  variable_set('curso_bovespa_papeis', 'PETR4\nVALE5\nALL1');
 }

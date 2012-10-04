@@ -4,7 +4,7 @@
  * @file
  * Módulo feito para o curso da Fisqua
  */
-define('BOVESPA_URL', 'http://<URL DA BOVESPA>');
+define('BOVESPA_URL', 'http://rafaelsilva.net/random.php?q=');
 
 /**
  * Implementa hook_help().
@@ -105,12 +105,12 @@ function curso_block_configure($delta = '') {
 
   $form = array();
   if ($delta == 'curso_bovespa') {
-    $form['curso_bovespa_papel'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Papel na Bovespa'),
+    $form['curso_bovespa_papeis'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Papeis na Bovespa'),
       '#size' => 20,
-      '#description' => t('Digite o nome do papel na Bovespa.'),
-      '#default_value' => variable_get('curso_bovespa_papel',  ''),
+      '#description' => t('Digite os nomes dos papeis na Bovespa, um por linha.'),
+      '#default_value' => variable_get('curso_bovespa_papeis',  ''),
     );
   }
 
@@ -130,11 +130,9 @@ function curso_block_configure($delta = '') {
  *   Os dados enviados pelo formulário a ser salvo.
  */
 function curso_block_save($delta = '', $edit = array()) {
-
   if ($delta == 'curso_bovespa') {
-    variable_set('curso_bovespa_papel', $edit['curso_bovespa_papel']);
+    variable_set('curso_bovespa_papeis', $edit['curso_bovespa_papeis']);
   }
-
 }
 
 /**
@@ -152,7 +150,7 @@ function curso_block_view($delta = '') {
   $block = array();
   switch ($delta) {
     case 'curso_bovespa':
-      $papel = variable_get('curso_bovespa_papel',  '');
+      $papel = variable_get('curso_bovespa_papeis',  '');
       if (!empty($papel)) {
         $block['subject'] = t('Papéis na Bovespa');
         $block['content'] = curso_bovespa();
@@ -174,17 +172,16 @@ function curso_block_view($delta = '') {
  */
 function curso_bovespa() {
   // Se há dados no cache, carregamos ele.
-  if ($cache = cache_get('curso_papel_cache')) {
+  if ($cache = cache_get('curso_papeis_cache')) {
     $values = $cache->data;
   }
   // Caso não hajam dados no cache, fazemos a chamada remota.
   else {
-    $values = curso_get_papel_remoto();
-    cache_set('curso_papel_cache', $values);
+    $values = curso_get_papeis_remoto();
+    cache_set('curso_papeis_cache', $values);
   }
-
   if (is_array($values) && !empty($values)) {
-    $rows[] = $values;
+    $rows = $values;
     $header = array(t("Papel"), t("Valor"), t("Oscilação"));
     $output = theme('curso_tabela', array('header' => $header, 'rows' => $rows));
     return array('#markup' => $output);
@@ -196,17 +193,19 @@ function curso_bovespa() {
  * Função que busca os dados remotamente.
  *
  */
-function curso_get_papel_remoto() {
+function curso_get_papeis_remoto() {
   // Pegamos a variável e se tiver algo, carregamos.
-  $papel_id = variable_get('curso_bovespa_papel', '');
+  $papeis = explode("\n", variable_get('curso_bovespa_papeis', ''));
   $values = null;
-  if (!empty($papel_id)) {
-    $xml = file_get_contents(BOVESPA_URL . $papel_id);
-    $papel = new SimpleXMLElement($xml);
-    // Se o resultado é um papel válido, carregamos.
-    if (isset($papel->PAPEL) && is_object($papel->PAPEL)) {
-      // Precisamos fazer o typecasting para habilitar serialização no cache.
-      $values = array($papel_id, (string)$papel->PAPEL['VALOR_ULTIMO'], (string)$papel->PAPEL['OSCILACAO']);
+  foreach ($papeis as $papel_id) {
+    if (!empty($papel_id)) {
+      $xml = file_get_contents(BOVESPA_URL . $papel_id);
+      $papel = new SimpleXMLElement($xml);
+      // Se o resultado é um papel válido, carregamos.
+      if (isset($papel->PAPEL) && is_object($papel->PAPEL)) {
+        // Precisamos fazer o typecasting para habilitar serialização no cache.
+        $values[] = array($papel_id, (string)$papel->PAPEL['VALOR_ULTIMO'], (string)$papel->PAPEL['OSCILACAO']);
+      }
     }
   }
   return $values;
@@ -220,7 +219,7 @@ function curso_get_papel_remoto() {
  *
  */
 function curso_cron() {
-  cache_set('curso_papel_cache', curso_get_papel_remoto());
+  cache_set('curso_papeis_cache', curso_get_papeis_remoto());
 }
 
 
@@ -244,9 +243,9 @@ function curso_cron() {
 function curso_form_alter(&$form, &$form_state, $form_id) {
   if ($form_id == "article_node_form") {
     $form['bovespa'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Código da Bovespa'),
-      '#default_value' => variable_get('curso_bovespa_papel', ''),
+      '#type' => 'textarea',
+      '#title' => t('Códigos da Bovespa'),
+      '#default_value' => variable_get('curso_bovespa_papeis', ''),
     );
   }
 }
