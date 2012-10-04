@@ -1,0 +1,5 @@
+name = Curso da Fisqua
+description = Módulo criado para a turma de desenvolvimento de módulos
+core = 7.x
+package = Fisqua
+configure = admin/config/services/curso

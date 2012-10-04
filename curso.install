@@ -1,0 +1,21 @@
+<?php
+
+/**
+ * Implementa hook_uninstall().
+ *
+ * Realiza limpeza do lixo criado pelo módulo no momento da desinstalação.
+ *
+ */
+function curso_uninstall() {
+  variable_del('curso_bovespa_papel');
+}
+
+/**
+ * Implementa hook_install().
+ *
+ * Cria a variavel que usaremos no módulo já com o valor padrão
+ *
+ */
+function curso_install() {
+  variable_set('curso_bovespa_papel', 'PETR4');
+}

@@ -1,0 +1,315 @@
+<?php
+
+/**
+ * @file
+ * Módulo feito para o curso da Fisqua
+ */
+define('BOVESPA_URL', 'http://<URL DA BOVESPA>');
+
+/**
+ * Implementa hook_help().
+ *
+ * Ajuda para o nosso módulo.
+ * Tratamos de duas situações: página de configuração e ajuda em geral.
+ *
+ * @param $path
+ *   O caminho da página de ajuda em questão.
+ *
+ * @param $arg
+ *   Um argumento extra, passado automaticamente e que podemos usar
+ *   eventualmente.
+ *
+ * @return
+ *   Retorna o texto da ajuda
+ */
+function curso_help($path, $arg) {
+  switch ($path) {
+    case 'admin/config/services/curso':
+      return t('Essa é a ajuda para a tela de configuração.');
+    case 'admin/help#curso':
+      return t('Essa é a ajuda geral do módulo.');
+  }
+}
+
+/**
+ * Implementa hook_permission()
+ *
+ * Define as permissões que serão usadas no nosso módulo
+ *
+ */
+function curso_permission() {
+  return array(
+    'administrar curso' =>  array(
+      'title' => t('Administar curso'),
+      'description' => t('Permite que o usuário administre as configurações do módulo curso.'),
+    ),
+  );
+}
+
+/**
+ * Implementa hook_menu().
+ *
+ * Criamos os links para todas as funcionalidades do nosso módulo que precisam
+ * de uma página.
+ *
+ * @return
+ *   Retorna o array com o menu.
+ */
+function curso_menu() {
+
+  $items['admin/config/services/curso'] = array(
+    'title' => 'Configurações do curos',
+    'description' => 'Edite as configurações do módulo Curso da Fisqua.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('curso_config'),
+    'access arguments' => array('administrar curso'),
+    'file' => 'curso.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Implementa hook_block_info().
+ *
+ * Declaração dos blocos usados pelo módulo.
+ *
+ * @return
+ *   Retorna o array de informação dos blocos.
+ */
+function curso_block_info() {
+
+  $blocks['curso_bovespa'] = array(
+    'info' => t('Índice da bolsa'),
+    'status' => TRUE,
+    'region' => 'sidebar_first',  // Definindo um bloco
+    'visibility' => BLOCK_VISIBILITY_LISTED, // Definindo visibilidade
+    'pages' => '<front>', // Dada a visibilidade, escolhemos onde.
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implementa hook_block_configure().
+ *
+ * Configuração dos blocos providos pelo módulo.
+ *
+ * @param $delta
+ *   O nome do bloco que está sendo configurado.
+ *
+ * @return
+ *   Retorna os campos adicionais para o nosso bloco.
+ */
+function curso_block_configure($delta = '') {
+
+  $form = array();
+  if ($delta == 'curso_bovespa') {
+    $form['curso_bovespa_papel'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Papel na Bovespa'),
+      '#size' => 20,
+      '#description' => t('Digite o nome do papel na Bovespa.'),
+      '#default_value' => variable_get('curso_bovespa_papel',  ''),
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Implementa hook_block_save().
+ *
+ * Diz como irá salvar as configurações. Você pode gravar essas informações
+ * em qualquer meio, aqui iremos gravar na tabela de variáveis.
+ *
+ * @param $delta
+ *   O nome do bloco que está sendo configurado.
+ *
+ * @param $edit
+ *   Os dados enviados pelo formulário a ser salvo.
+ */
+function curso_block_save($delta = '', $edit = array()) {
+
+  if ($delta == 'curso_bovespa') {
+    variable_set('curso_bovespa_papel', $edit['curso_bovespa_papel']);
+  }
+
+}
+
+/**
+ * Implementa hook_block_view().
+ *
+ * Exibe o nosso bloco.
+ *
+ * @param $delta
+ *   O nome do bloco que está sendo configurado.
+ *
+ * @return
+ *   Retorna o bloco para renderização.
+ */
+function curso_block_view($delta = '') {
+  $block = array();
+  switch ($delta) {
+    case 'curso_bovespa':
+      $papel = variable_get('curso_bovespa_papel',  '');
+      if (!empty($papel)) {
+        $block['subject'] = t('Papéis na Bovespa');
+        $block['content'] = curso_bovespa();
+      }
+
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Função que carrega o papel informado no bloco.
+ *
+ * Os dados podem vir do cache, caso existam lá, senão fazemos o carregamento
+ * na hora.
+ *
+ * @return
+ *   Retorna o conteúdo do bloco
+ */
+function curso_bovespa() {
+  // Se há dados no cache, carregamos ele.
+  if ($cache = cache_get('curso_papel_cache')) {
+    $values = $cache->data;
+  }
+  // Caso não hajam dados no cache, fazemos a chamada remota.
+  else {
+    $values = curso_get_papel_remoto();
+    cache_set('curso_papel_cache', $values);
+  }
+
+  if (is_array($values) && !empty($values)) {
+    $rows[] = $values;
+    $header = array(t("Papel"), t("Valor"), t("Oscilação"));
+    $output = theme('curso_tabela', array('header' => $header, 'rows' => $rows));
+    return array('#markup' => $output);
+  }
+}
+
+/**
+ *
+ * Função que busca os dados remotamente.
+ *
+ */
+function curso_get_papel_remoto() {
+  // Pegamos a variável e se tiver algo, carregamos.
+  $papel_id = variable_get('curso_bovespa_papel', '');
+  $values = null;
+  if (!empty($papel_id)) {
+    $xml = file_get_contents(BOVESPA_URL . $papel_id);
+    $papel = new SimpleXMLElement($xml);
+    // Se o resultado é um papel válido, carregamos.
+    if (isset($papel->PAPEL) && is_object($papel->PAPEL)) {
+      // Precisamos fazer o typecasting para habilitar serialização no cache.
+      $values = array($papel_id, (string)$papel->PAPEL['VALOR_ULTIMO'], (string)$papel->PAPEL['OSCILACAO']);
+    }
+  }
+  return $values;
+}
+
+/**
+ * Implementa hook_cron().
+ *
+ * Toda vez que o cron rodar, executará essa função.
+ * Aqui fazemos uma atualização dos dados em cache.
+ *
+ */
+function curso_cron() {
+  cache_set('curso_papel_cache', curso_get_papel_remoto());
+}
+
+
+/**
+ * Implementa hook_form_alter().
+ *
+ * Com essa função podemos alterar qualquer formulário gerado pelo Drupal.
+ * Aqui alteramos apenas o formulário de criação/edição de artigos
+ *
+ * Perceba que não há retorno nessa função. A alteração é feita na variável
+ * $form que é passada por referência (perceba o & na assinatura).
+ *
+ * @param $form
+ *   A estrutura do formulário
+ * @param $form_state
+ *   Os dados do formulário submetido
+ * @param $form_id
+ *   O identificador do formulário em questão.
+ *
+ */
+function curso_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == "article_node_form") {
+    $form['bovespa'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Código da Bovespa'),
+      '#default_value' => variable_get('curso_bovespa_papel', ''),
+    );
+  }
+}
+
+/**
+ * Implementa hook_node_view().
+ *
+ * Com essa função podemos incluir campos à visualização de um node
+ *
+ * Note que aqui também não há retorno, mas a mudanaça acontece. Isso porque
+ * a variável $node é um objeto que no php é passado automaticamente por
+ * referência (em alguns casos, mas especificamente nesse caso).
+ *
+ * @param $node
+ *   O node que será alterado
+ * @param $view_mode
+ *   O tipo de visualização. Se full, teaser, rss etc.
+ * @param $langcode
+ *   Identificação do idioma do node
+ *
+ */
+function curso_node_view($node, $view_mode, $langcode) {
+  if ($node->type == "article") {
+    $node->content['curso_bovespa'] = curso_bovespa();
+  }
+}
+
+/**
+ * Implementa hook_theme().
+ *
+ * Implementa quais funções são tematizaveis.
+ *
+ * @return
+ *   Lista com as funções que são tematizaveis.
+ *
+ */
+function curso_theme() {
+  return array(
+    'curso_tabela' => array(
+      'variables' => array(),
+    ),
+  );
+}
+
+/**
+ * Definição da função tematizada, definida no hook_theme().
+ *
+ * Essa função pega os valores que são passada na hora de carregar o tema.
+ *
+ *
+ * @param $variables
+ *   As variaveis passadas para a função como atributos na chamada.
+ *
+ * @return
+ *   Lista com as funções que são tematizaveis.
+ *
+ */
+function theme_curso_tabela(&$variables) {
+  $variables['caption'] = t('Minhas cotações');
+  // definimos uma classe específica para nossa tabela.
+  $variables['attributes'] = array('class' => array('curso'));
+  // fazemos a inclusão de um css para personalizar.
+  drupal_add_css(drupal_get_path('module', 'curso') . '/css/curso.css');
+  // chamamos a função de tema original com nossa modificação.
+  return theme('table', $variables);
+}
